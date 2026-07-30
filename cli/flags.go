@@ -25,6 +25,10 @@ var (
 	// for agent install command
 	agentForce               bool
 	agentProvisioningProfile string
+	runnerBundleID           string
+	xctestConfig             string
+	listenHost               string
+	listenPort               string
 
 	// for fleet allocate command
 	fleetType     string

@@ -21,6 +21,7 @@ const (
 	iosRunnerBundleID   = "com.mobilenext.devicekit-iosUITests.xctrunner"
 	tvosRunnerBundleID  = "com.mobilenext.devicekit-tvosUITests.xctrunner"
 	androidPackageName  = "com.mobilenext.devicekit"
+	agentRunnerBundleID = iosRunnerBundleID
 )
 
 // pinned SHA-256 checksums for agent artifacts, keyed by download filename
@@ -165,6 +166,56 @@ var agentInstallCmd = &cobra.Command{
 			},
 		}))
 		return nil
+	},
+}
+
+var agentInstallLocalCmd = &cobra.Command{
+	Use:   "install-local [ipa]",
+	Short: "Re-sign and install a local iOS runner IPA",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		device, err := commands.FindDeviceOrAutoSelect(deviceId)
+		if err != nil {
+			return err
+		}
+
+		resignedPath, err := utils.ResignIPA(args[0], device.ID(), agentProvisioningProfile, signingIdentity)
+		if err != nil {
+			return fmt.Errorf("failed to re-sign runner: %w", err)
+		}
+		defer func() { _ = os.Remove(resignedPath) }()
+
+		if err := device.InstallApp(resignedPath); err != nil {
+			return fmt.Errorf("failed to install runner: %w", err)
+		}
+		return waitForInstalledBundle(device, "com.smbcloud.xcrs-controlkit.runnerUITests.xctrunner")
+	},
+}
+
+var agentStartCmd = &cobra.Command{
+	Use:   "start",
+	Short: "Start an installed iOS XCTest runner",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		device, err := commands.FindDeviceOrAutoSelect(deviceId)
+		if err != nil {
+			return err
+		}
+		iosDevice, ok := device.(*devices.IOSDevice)
+		if !ok {
+			return fmt.Errorf("agent start currently supports physical iOS devices only")
+		}
+
+		environment := map[string]any{}
+		if listenHost != "" {
+			environment["CONTROLKIT_LISTEN_HOST"] = listenHost
+		}
+		if listenPort != "" {
+			environment["CONTROLKIT_LISTEN_PORT"] = listenPort
+		}
+		if err := iosDevice.LaunchTestRunnerWithEnv(runnerBundleID, runnerBundleID, xctestConfig, environment); err != nil {
+			return err
+		}
+		select {}
 	},
 }
 
@@ -370,14 +421,23 @@ func isAgentInstalled(device devices.ControllableDevice) bool {
 }
 
 func waitForAgentInstalled(device devices.ControllableDevice) error {
+	return waitForInstalledBundle(device, agentRunnerBundleID)
+}
+
+func waitForInstalledBundle(device devices.ControllableDevice, bundleSuffix string) error {
 	startTime := time.Now()
 	for {
-		if isAgentInstalled(device) {
-			return nil
+		apps, err := device.ListApps(false)
+		if err == nil {
+			for _, app := range apps {
+				if strings.HasSuffix(app.PackageName, bundleSuffix) {
+					return nil
+				}
+			}
 		}
 
 		if time.Since(startTime) > 30*time.Second {
-			return fmt.Errorf("agent not found after 30 seconds")
+			return fmt.Errorf("bundle %q not found after 30 seconds", bundleSuffix)
 		}
 
 		utils.Verbose("waiting for agent to appear in installed apps...")
@@ -389,6 +449,8 @@ func init() {
 	rootCmd.AddCommand(agentCmd)
 
 	agentCmd.AddCommand(agentInstallCmd)
+	agentCmd.AddCommand(agentInstallLocalCmd)
+	agentCmd.AddCommand(agentStartCmd)
 	agentCmd.AddCommand(agentStatusCmd)
 	agentCmd.AddCommand(agentUninstallCmd)
 
@@ -397,4 +459,10 @@ func init() {
 	agentUninstallCmd.Flags().StringVar(&deviceId, "device", "", "ID of the device to uninstall the agent from")
 	agentInstallCmd.Flags().BoolVar(&agentForce, "force", false, "force install even if agent is already installed")
 	agentInstallCmd.Flags().StringVar(&agentProvisioningProfile, "provisioning-profile", "", "path to a .mobileprovision file to use for re-signing (required for real iOS devices)")
+	agentInstallLocalCmd.Flags().StringVar(&agentProvisioningProfile, "provisioning-profile", "", "path to a .mobileprovision file to use for re-signing")
+	agentInstallLocalCmd.Flags().StringVar(&signingIdentity, "signing-identity", "", "signing identity override")
+	agentStartCmd.Flags().StringVar(&runnerBundleID, "runner-bundle-id", "", "installed XCTest runner bundle ID")
+	agentStartCmd.Flags().StringVar(&xctestConfig, "xctest-config", "", " XCTest bundle name")
+	agentStartCmd.Flags().StringVar(&listenHost, "listen-host", "", "CONTROLKIT_LISTEN_HOST value")
+	agentStartCmd.Flags().StringVar(&listenPort, "listen-port", "", "CONTROLKIT_LISTEN_PORT value")
 }

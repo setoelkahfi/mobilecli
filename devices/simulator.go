@@ -491,10 +491,10 @@ func (s *SimulatorDevice) StartAgent(config StartAgentConfig) error {
 		return fmt.Errorf("failed to find available port: %w", err)
 	}
 
-	utils.Verbose("Starting agent with DEVICEKIT_LISTEN_PORT=%d", usePort)
+	utils.Verbose("Starting agent with CONTROLKIT_LISTEN_PORT=%d", usePort)
 
 	env := map[string]string{
-		"DEVICEKIT_LISTEN_PORT": strconv.Itoa(usePort),
+		"CONTROLKIT_LISTEN_PORT": strconv.Itoa(usePort),
 	}
 
 	err = s.LaunchAppWithEnv(agentBundleID, env)
@@ -823,7 +823,7 @@ func (s SimulatorDevice) DumpSourceRaw() (any, error) {
 }
 
 func (s *SimulatorDevice) getWdaPort() (int, error) {
-	return s.getWdaEnvPort("DEVICEKIT_LISTEN_PORT")
+	return s.getWdaEnvPort("CONTROLKIT_LISTEN_PORT")
 }
 
 func (s *SimulatorDevice) getWdaMjpegPort() (int, error) {

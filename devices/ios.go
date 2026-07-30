@@ -594,6 +594,10 @@ func (d *IOSDevice) StartAgent(config StartAgentConfig) error {
 }
 
 func (d *IOSDevice) LaunchTestRunner(bundleID, testRunnerBundleID, xctestConfig string) error {
+	return d.LaunchTestRunnerWithEnv(bundleID, testRunnerBundleID, xctestConfig, nil)
+}
+
+func (d *IOSDevice) LaunchTestRunnerWithEnv(bundleID, testRunnerBundleID, xctestConfig string, environment map[string]any) error {
 	if bundleID == "" && testRunnerBundleID == "" && xctestConfig == "" {
 		utils.Verbose("No bundle ids specified, falling back to defaults")
 		bundleID, testRunnerBundleID, xctestConfig = agentRunnerBundleID, agentRunnerBundleID, "devicekit-iosUITests.xctest"
@@ -631,7 +635,7 @@ func (d *IOSDevice) LaunchTestRunner(bundleID, testRunnerBundleID, xctestConfig 
 			BundleId:           bundleID,
 			TestRunnerBundleId: testRunnerBundleID,
 			XctestConfigName:   xctestConfig,
-			Env:                map[string]any{},
+			Env:                environment,
 			Args:               []string{},
 			Device:             device,
 			Listener:           testmanagerd.NewTestListener(io.Discard, io.Discard, "/tmp"),

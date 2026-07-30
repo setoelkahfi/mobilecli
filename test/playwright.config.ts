@@ -10,6 +10,7 @@ export default defineConfig({
 	projects: [
 		{name: 'server', testMatch: /server\.spec\.ts/},
 		{name: 'simulator', testMatch: /simulator\.spec\.ts/},
+		{name: 'ios-app', testMatch: /ios-app\.spec\.ts/},
 		{name: 'emulator', testMatch: /emulator\.spec\.ts/},
 	],
 });
